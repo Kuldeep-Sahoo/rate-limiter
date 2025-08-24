@@ -2,21 +2,25 @@ import express from "express";
 import Redis from "ioredis";
 
 const app = express();
-const redis = new Redis();
+const redis = new Redis(); // connects to 127.0.0.1:6379 (local redis)
+
+// trust proxy (important for real IPs from clients)
+app.set("trust proxy", 1);
 
 const rateLimiter = async (req, res, next) => {
-  const ip = req.headers["x-forwarded-for"] || req.connection.remoteAddress;
+  const ip = req.ip; // now this will capture client IP on AWS
   const limit = 3;
   const windowSec = 60;
   const key = `rate-limit:${ip}`;
   console.log({ key });
+
   const requests = await redis.incr(key);
   if (requests === 1) {
     await redis.expire(key, windowSec);
   }
   if (requests > limit) {
     return res.status(429).json({
-      message: "Too many requests,please try again later.",
+      message: "Too many requests, please try again later.",
     });
   }
   next();
